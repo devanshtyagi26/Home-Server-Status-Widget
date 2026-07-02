@@ -6,10 +6,10 @@ const widgetConfig: WithAndroidWidgetsParams = {
     {
       name: 'HomeServerHealth',
       label: 'Home Server Health',
-      minWidth: '320dp',
-      minHeight: '120dp',
-      targetCellWidth: 4,
-      targetCellHeight: 2,
+      minWidth: '160dp',
+      minHeight: '400dp',
+      targetCellWidth: 2,
+      targetCellHeight: 5,
       description: 'Monitor your home server status at a glance',
       previewImage: './assets/widget-preview/home-server-health.png',
       // Update every 30 minutes (minimum allowed by Android)

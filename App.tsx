@@ -93,8 +93,8 @@ export default function App() {
         <View style={styles.previewContainer}>
           <WidgetPreview
             renderWidget={() => <HomeServerHealthWidget data={data ?? undefined} />}
-            height={200}
-            width={320}
+            height={480}
+            width={180}
           />
         </View>
 
