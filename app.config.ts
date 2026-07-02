@@ -1,17 +1,17 @@
-import type { ConfigContext, ExpoConfig } from 'expo/config';
-import type { WithAndroidWidgetsParams } from 'react-native-android-widget';
+import type { ConfigContext, ExpoConfig } from "expo/config";
+import type { WithAndroidWidgetsParams } from "react-native-android-widget";
 
 const widgetConfig: WithAndroidWidgetsParams = {
   widgets: [
     {
-      name: 'HomeServerHealth',
-      label: 'Home Server Health',
-      minWidth: '160dp',
-      minHeight: '400dp',
+      name: "HomeServerHealth",
+      label: "Home Server Health",
+      minWidth: "160dp",
+      minHeight: "320dp",
       targetCellWidth: 2,
-      targetCellHeight: 5,
-      description: 'Monitor your home server status at a glance',
-      previewImage: './assets/widget-preview/home-server-health.png',
+      targetCellHeight: 4,
+      description: "Monitor your home server status at a glance",
+      previewImage: "./assets/widget-preview/home-server-health.png",
       // Update every 30 minutes (minimum allowed by Android)
       updatePeriodMillis: 1800000,
     },
@@ -20,23 +20,23 @@ const widgetConfig: WithAndroidWidgetsParams = {
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: 'Home Server Health',
-  slug: 'home-server-health',
-  version: '1.0.0',
-  orientation: 'portrait',
-  icon: './assets/images/icon.png',
-  userInterfaceStyle: 'dark',
+  name: "Home Server Health",
+  slug: "home-server-health",
+  version: "1.0.0",
+  orientation: "portrait",
+  icon: "./assets/images/icon.png",
+  userInterfaceStyle: "dark",
   splash: {
-    image: './assets/images/splash.png',
-    resizeMode: 'contain',
-    backgroundColor: '#0f172a',
+    image: "./assets/images/splash.png",
+    resizeMode: "contain",
+    backgroundColor: "#0f172a",
   },
   android: {
     adaptiveIcon: {
-      foregroundImage: './assets/images/adaptive-icon.png',
-      backgroundColor: '#0f172a',
+      foregroundImage: "./assets/images/adaptive-icon.png",
+      backgroundColor: "#0f172a",
     },
-    package: 'com.homeserverhealth.app',
+    package: "com.homeserverhealth.app",
   },
-  plugins: [['react-native-android-widget', widgetConfig]],
+  plugins: [["react-native-android-widget", widgetConfig]],
 });

@@ -11,55 +11,115 @@ export interface ServerData {
   totalCount: number;
   lastChecked: string;
   serverDown?: boolean;
+  /** Optional: minutes since lastChecked was computed. Drives the "stale" badge. */
+  minutesSinceCheck?: number;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Design tokens — single source of truth for spacing/radius/colors  */
+/*  so nothing drifts out of alignment as the widget evolves.         */
+/* ------------------------------------------------------------------ */
+
+const SPACE = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+};
+
+const RADIUS = {
+  card: 20,
+  pill: 8,
+  dot: 4,
+};
+
 const C = {
-  bg: "#2b2b2b",
-  border: "#3f3f3f",
-  dot: "#454545",
-  textPrimary: "#f0f0f0",
-  textMuted: "#888888",
+  bg: "#232323",
+  bgElevated: "#2b2b2b",
+  border: "#3a3a3a",
+  divider: "#3a3a3a",
+  textPrimary: "#f5f5f5",
+  textSecondary: "#b5b5b5",
+  textMuted: "#7a7a7a",
   green: "#4ade80",
+  greenDim: "#153b26",
   amber: "#fbbf24",
+  amberDim: "#3d2e08",
   rose: "#fb7185",
-  greenDim: "#14432a",
-  roseDim: "#3b0f18",
+  roseDim: "#3a1420",
+  track: "#3a3a3a",
 };
 
 function statusColor(s: ServiceStatus) {
   return s === "ONLINE" ? C.green : s === "OFFLINE" ? C.rose : C.amber;
 }
 
-function topServices(services: Record<string, ServiceStatus>, max = 9) {
-  const entries = Object.entries(services);
-  entries.sort(([, a], [, b]) => {
-    if (a === b) return 0;
-    if (a === "OFFLINE") return -1;
-    if (b === "OFFLINE") return 1;
-    return 0;
-  });
-  return entries.slice(0, max);
-}
-
 function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function DotRow({ cols }: { cols: number }) {
+/** Offline first, then unknown, then online — the things that need
+ *  attention should always be visible even if the list gets truncated. */
+function sortedServices(services: Record<string, ServiceStatus>, max = 8) {
+  const rank: Record<ServiceStatus, number> = {
+    OFFLINE: 0,
+    UNKNOWN: 1,
+    ONLINE: 2,
+  };
+  return Object.entries(services)
+    .sort(([, a], [, b]) => rank[a] - rank[b])
+    .slice(0, max);
+}
+
+function StatusPill({
+  label,
+  color,
+  bg,
+}: {
+  label: string;
+  color: string;
+  bg: string;
+}) {
   return (
-    <FlexWidget style={{ flexDirection: "row", marginBottom: 10 }}>
-      {Array.from({ length: cols }).map((_, i) => (
-        <FlexWidget
-          key={i}
-          style={{
-            width: 3,
-            height: 3,
-            borderRadius: 2,
-            backgroundColor: C.dot,
-            marginRight: 10,
-          }}
-        />
-      ))}
+    <FlexWidget
+      style={{
+        backgroundColor: bg,
+        borderRadius: RADIUS.pill,
+        paddingHorizontal: SPACE.sm,
+        paddingVertical: 4,
+      }}
+    >
+      <TextWidget
+        text={label}
+        style={{ fontSize: 10, color, fontFamily: "sans-serif-medium" }}
+      />
+    </FlexWidget>
+  );
+}
+
+/** Slim proportional bar showing onlineCount / totalCount at a glance —
+ *  reads faster than the "3/5" text alone and fills otherwise-empty space
+ *  in the header in a purposeful way. */
+function UptimeBar({ ratio, color }: { ratio: number; color: string }) {
+  const pct = Math.max(0, Math.min(1, ratio));
+  return (
+    <FlexWidget
+      style={{
+        height: 4,
+        backgroundColor: C.track,
+        borderRadius: 2,
+        marginHorizontal: SPACE.lg,
+        marginBottom: SPACE.sm,
+      }}
+    >
+      <FlexWidget
+        style={{
+          height: 4,
+          width: `${Math.round(pct * 100)}%` as unknown as number,
+          backgroundColor: color,
+          borderRadius: 2,
+        }}
+      />
     </FlexWidget>
   );
 }
@@ -71,17 +131,17 @@ function ServiceRow({ name, status }: { name: string; status: ServiceStatus }) {
       style={{
         flexDirection: "row",
         alignItems: "center",
-        paddingVertical: 6,
-        paddingHorizontal: 12,
+        paddingVertical: SPACE.xs,
+        paddingHorizontal: SPACE.lg,
       }}
     >
       <FlexWidget
         style={{
-          width: 7,
-          height: 7,
-          borderRadius: 4,
+          width: 8,
+          height: 8,
+          borderRadius: RADIUS.dot,
           backgroundColor: color,
-          marginRight: 10,
+          marginRight: SPACE.sm,
         }}
       />
       <TextWidget
@@ -93,60 +153,57 @@ function ServiceRow({ name, status }: { name: string; status: ServiceStatus }) {
           flex: 1,
         }}
       />
-      <TextWidget
-        text={status}
-        style={{ fontSize: 10, color, fontFamily: "sans-serif" }}
-      />
     </FlexWidget>
   );
 }
 
-function Divider() {
+function Divider({ inset = SPACE.lg }: { inset?: number }) {
   return (
     <FlexWidget
-      style={{ height: 1, backgroundColor: C.border, marginHorizontal: 12 }}
+      style={{ height: 1, backgroundColor: C.divider, marginHorizontal: inset }}
     />
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Main widget                                                       */
+/* ------------------------------------------------------------------ */
+
 export function HomeServerHealthWidget({ data }: { data?: ServerData }) {
   const allGood = data?.allOnline ?? true;
   const serverDown = data?.serverDown ?? false;
-  const headerDot = serverDown ? C.amber : allGood ? C.green : C.rose;
-  const badgeBg = serverDown ? "#3d2a00" : allGood ? C.greenDim : C.roseDim;
-  const shown = data ? topServices(data.services) : [];
+  const isStale = (data?.minutesSinceCheck ?? 0) > 15;
+
+  const headerColor = serverDown ? C.amber : allGood ? C.green : C.rose;
+  const headerBg = serverDown ? C.amberDim : allGood ? C.greenDim : C.roseDim;
+
+  const offlineCount = data ? data.totalCount - data.onlineCount : 0;
+  const shown = data ? sortedServices(data.services) : [];
+  const hiddenCount = data
+    ? Math.max(0, Object.keys(data.services).length - shown.length)
+    : 0;
 
   return (
+    // A single outer card owns the background + radius; nothing inside
+    // re-declares a background color, which is what was causing the
+    // misaligned/duplicated-corner look before.
     <FlexWidget
+      clickAction="OPEN_APP"
       style={{
         height: "match_parent",
         width: "match_parent",
         flexDirection: "column",
         backgroundColor: C.bg,
-        borderRadius: 20,
+        borderRadius: RADIUS.card,
       }}
     >
-      {/* Decorative dots */}
-      <FlexWidget
-        style={{
-          flexDirection: "column",
-          paddingTop: 10,
-          paddingLeft: 12,
-          paddingRight: 12,
-        }}
-      >
-        <DotRow cols={12} />
-        <DotRow cols={12} />
-      </FlexWidget>
-
       {/* Header */}
       <FlexWidget
         style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          paddingHorizontal: 12,
-          paddingBottom: 8,
+          flexDirection: "column",
+          paddingHorizontal: SPACE.lg,
+          paddingTop: SPACE.lg,
+          paddingBottom: SPACE.sm,
         }}
       >
         <FlexWidget style={{ flexDirection: "row", alignItems: "center" }}>
@@ -155,48 +212,63 @@ export function HomeServerHealthWidget({ data }: { data?: ServerData }) {
               width: 8,
               height: 8,
               borderRadius: 4,
-              backgroundColor: headerDot,
-              marginRight: 7,
+              backgroundColor: headerColor,
+              marginRight: SPACE.sm,
             }}
           />
           <TextWidget
             text={data?.serverName ?? "HOME SERVER"}
             style={{
-              fontSize: 12,
+              fontSize: 13,
               color: C.textPrimary,
               fontFamily: "sans-serif-medium",
             }}
           />
         </FlexWidget>
-        <FlexWidget
+
+        {/* One-line status summary so the header carries meaning even
+            at a glance, before reading the service list. */}
+        <TextWidget
+          text={
+            serverDown
+              ? "Unreachable"
+              : allGood
+                ? "All systems operational"
+                : `${offlineCount} service${offlineCount === 1 ? "" : "s"} need attention`
+          }
           style={{
-            backgroundColor: badgeBg,
-            borderRadius: 6,
-            paddingHorizontal: 8,
-            paddingVertical: 3,
+            fontSize: 10,
+            color: C.textSecondary,
+            fontFamily: "sans-serif",
+            marginTop: 2,
+            marginLeft: SPACE.md + 4,
           }}
-        >
-          <TextWidget
-            text={
+        />
+
+        {/* Count pill on its own line, below the title block. */}
+        <FlexWidget style={{ flexDirection: "row", marginTop: SPACE.sm }}>
+          <StatusPill
+            label={
               serverDown
-                ? "SERVER DOWN"
+                ? "DOWN"
                 : data
-                  ? `${data.onlineCount}/${data.totalCount}`
+                  ? `${data.onlineCount}/${data.totalCount} ONLINE`
                   : "…"
             }
-            style={{
-              fontSize: 10,
-              color: headerDot,
-              fontFamily: "sans-serif-medium",
-            }}
+            color={headerColor}
+            bg={headerBg}
           />
         </FlexWidget>
       </FlexWidget>
 
-      {/* Divider */}
-      <FlexWidget
-        style={{ height: 1, backgroundColor: "#555555", marginBottom: 4 }}
-      />
+      {data && !serverDown && (
+        <UptimeBar
+          ratio={data.totalCount ? data.onlineCount / data.totalCount : 1}
+          color={headerColor}
+        />
+      )}
+
+      <Divider inset={0} />
 
       {/* Service list */}
       {shown.length === 0 ? (
@@ -213,31 +285,84 @@ export function HomeServerHealthWidget({ data }: { data?: ServerData }) {
           />
         </FlexWidget>
       ) : (
-        <FlexWidget style={{ flexDirection: "column", flex: 1 }}>
+        <FlexWidget
+          style={{
+            flexDirection: "column",
+            flex: 1,
+            paddingVertical: SPACE.xs,
+          }}
+        >
           {shown.map(([name, status], i) => (
             <FlexWidget key={name} style={{ flexDirection: "column" }}>
               <ServiceRow name={name} status={status} />
               {i < shown.length - 1 && <Divider />}
             </FlexWidget>
           ))}
+          {hiddenCount > 0 && (
+            <TextWidget
+              text={`+${hiddenCount} more`}
+              style={{
+                fontSize: 10,
+                color: C.textMuted,
+                fontFamily: "sans-serif",
+                paddingHorizontal: SPACE.lg,
+                paddingTop: SPACE.xs,
+              }}
+            />
+          )}
         </FlexWidget>
       )}
 
+      <Divider inset={0} />
+
       {/* Footer */}
-      <FlexWidget style={{ height: 1, backgroundColor: "#555555" }} />
       <FlexWidget
         style={{
-          flexDirection: "column",
-          paddingBottom: 10,
-          paddingTop: 4,
-          paddingHorizontal: 12,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+          paddingHorizontal: SPACE.lg,
+          paddingVertical: SPACE.sm,
         }}
       >
         <TextWidget
           text={data ? `Updated ${data.lastChecked}` : ""}
           style={{ fontSize: 9, color: C.textMuted, fontFamily: "sans-serif" }}
         />
-        <DotRow cols={12} />
+        <FlexWidget style={{ flexDirection: "row", alignItems: "center" }}>
+          {isStale && (
+            <TextWidget
+              text="STALE"
+              style={{
+                fontSize: 9,
+                color: C.amber,
+                fontFamily: "sans-serif-medium",
+                marginRight: SPACE.sm,
+              }}
+            />
+          )}
+          {/* Tap-to-refresh affordance. Wire "REFRESH" up in your
+              widget task handler (widget-task-handler.ts) to re-run
+              your health check and call requestWidgetUpdate. */}
+          <FlexWidget
+            clickAction="REFRESH"
+            style={{
+              paddingHorizontal: SPACE.sm,
+              paddingVertical: 2,
+              borderRadius: RADIUS.pill,
+              backgroundColor: C.bgElevated,
+            }}
+          >
+            <TextWidget
+              text="REFRESH"
+              style={{
+                fontSize: 9,
+                color: C.textSecondary,
+                fontFamily: "sans-serif-medium",
+              }}
+            />
+          </FlexWidget>
+        </FlexWidget>
       </FlexWidget>
     </FlexWidget>
   );
