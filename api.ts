@@ -91,3 +91,30 @@ export async function fetchServerData(): Promise<ServerData> {
     };
   }
 }
+
+export async function sendCommand(commandKey: string): Promise<{
+  success: boolean;
+  output: string;
+  command: string;
+}> {
+  const BASE_URL = STATUS_URL.replace("/api/status", "");
+  const { signal, clear } = makeTimeout(20_000); // longer timeout for commands like reboot
+
+  try {
+    const res = await fetch(`${BASE_URL}/api/command?secret=${STATUS_SECRET}`, {
+      method: "POST",
+      signal,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ commandKey }),
+    });
+    clear();
+    return await res.json();
+  } catch (err: any) {
+    clear();
+    return {
+      success: false,
+      command: commandKey,
+      output: err.message ?? "Request failed",
+    };
+  }
+}

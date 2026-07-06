@@ -20,6 +20,8 @@ import {
 import { fetchServerData } from "./api";
 import { registerBackgroundFetch } from "./background-task";
 import * as BackgroundFetch from "expo-background-fetch";
+import CommandsScreen from "./page/CommandScreen";
+import { RADIUS, SPACE, C } from "./theme";
 
 const SERVER_NAME = process.env.EXPO_PUBLIC_SERVER_NAME ?? "Home Server";
 
@@ -27,26 +29,6 @@ const SERVER_NAME = process.env.EXPO_PUBLIC_SERVER_NAME ?? "Home Server";
 /*  Same palette + spacing scale as HomeServerHealthWidget, so the    */
 /*  in-app screen and the home-screen widget feel like one product.   */
 /* ------------------------------------------------------------------ */
-
-const C = {
-  bg: "#1c1c1c",
-  surface: "#232323",
-  surfaceElevated: "#2b2b2b",
-  border: "#3a3a3a",
-  divider: "#3a3a3a",
-  text: "#f5f5f5",
-  textSecondary: "#b5b5b5",
-  muted: "#7a7a7a",
-  green: "#4ade80",
-  greenDim: "#153b26",
-  amber: "#fbbf24",
-  amberDim: "#3d2e08",
-  rose: "#fb7185",
-  roseDim: "#3a1420",
-};
-
-const SPACE = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20 };
-const RADIUS = { card: 20, pill: 8 };
 
 function dotColor(s: ServiceStatus) {
   return s === "ONLINE" ? C.green : s === "OFFLINE" ? C.rose : C.amber;
@@ -72,6 +54,7 @@ function ServiceRow({ name, status }: { name: string; status: ServiceStatus }) {
 export default function App() {
   const [data, setData] = useState<ServerData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState<"status" | "commands">("status");
 
   async function refresh() {
     setLoading(true);
@@ -131,6 +114,22 @@ export default function App() {
         )}
       </View>
 
+      {/* Tab bar */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity style={styles.tab} onPress={() => setTab("status")}>
+          <Text style={[styles.tabText, tab === "status" && styles.tabActive]}>
+            Status
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.tab} onPress={() => setTab("commands")}>
+          <Text
+            style={[styles.tabText, tab === "commands" && styles.tabActive]}
+          >
+            Commands
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Widget preview */}
         {/* <Text style={styles.sectionLabel}>Widget Preview</Text>
@@ -144,24 +143,30 @@ export default function App() {
           />
         </View> */}
 
-        {/* Services list */}
-        <Text style={styles.sectionLabel}>Services</Text>
-        <View style={styles.card}>
-          {data && Object.keys(data.services).length > 0 ? (
-            Object.entries(data.services).map(([name, status]) => (
-              <ServiceRow key={name} name={name} status={status} />
-            ))
-          ) : (
-            <Text style={styles.emptyText}>
-              {loading ? "Fetching status…" : "No services found"}
-            </Text>
-          )}
-        </View>
+        {tab === "status" ? (
+          <>
+            {/* Services list */}
+            <Text style={styles.sectionLabel}>Services</Text>
+            <View style={styles.card}>
+              {data && Object.keys(data.services).length > 0 ? (
+                Object.entries(data.services).map(([name, status]) => (
+                  <ServiceRow key={name} name={name} status={status} />
+                ))
+              ) : (
+                <Text style={styles.emptyText}>
+                  {loading ? "Fetching status…" : "No services found"}
+                </Text>
+              )}
+            </View>
 
-        {data?.lastChecked && (
-          <Text style={styles.updatedAt}>
-            Last updated at {data.lastChecked}
-          </Text>
+            {data?.lastChecked && (
+              <Text style={styles.updatedAt}>
+                Last updated at {data.lastChecked}
+              </Text>
+            )}
+          </>
+        ) : (
+          <CommandsScreen />
         )}
       </ScrollView>
 
@@ -267,4 +272,8 @@ const styles = StyleSheet.create({
     marginTop: SPACE.sm,
   },
   refreshText: { color: C.text, fontSize: 15, fontWeight: "700" },
+  tabBar: { flexDirection: "row", borderTopWidth: 1, borderTopColor: C.border },
+  tab: { flex: 1, paddingVertical: 14, alignItems: "center" },
+  tabText: { color: C.muted, fontSize: 13, fontWeight: "600" },
+  tabActive: { color: C.cyan },
 });
